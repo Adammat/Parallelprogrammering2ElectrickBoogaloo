@@ -337,7 +337,7 @@ public class CarControl implements CarControlI{
 //				// TODO Auto-generated catch block
 //				e.printStackTrace();
 //			}
-    		Pos temppos = conductor[no].curpos;
+    		Pos temppos = conductor[no].nextPos(conductor[no].curpos);
     		conductor[no] = new Conductor(no,cd,gate[no], semTiles, alley, bar, conductor[no].alleyEnter, conductor[no].alleyLeave);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
