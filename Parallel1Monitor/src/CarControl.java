@@ -71,13 +71,9 @@ class Conductor extends Thread {
     	String positions = "";
     	for(int i =0;i < this.semTiles.length;i++) {
     		for(int j =0;j < this.semTiles[i].length;j++) {
-        		if(semTiles[i][j].toString().equals("1")){
-        			System.out.print("[ ]");
-        		}
-        		else {
-        			System.out.print("[X]");
-        			positions+="("+i+","+j+")";
-        		}
+        			System.out.print("["+semTiles[i][j].toString() + "]");
+        		
+        		
         	}
     		System.out.print("\n");
     	}
@@ -317,6 +313,15 @@ public class CarControl implements CarControlI{
 	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
 	        cond.semTiles[next.row][next.col].V();
 	        alley.leave(no);
+	        alley.fairnessGuard[no-1] = false;
+	        bar.carRemove(no);
+	        
+	        if(cond.curpos.equals(new Pos(ROWS-2,2)) || cond.curpos.equals(new Pos(ROWS-3,0))){
+	        	alley.lowerWait = false;
+	        } else if (cond.curpos.equals(new Pos(1,0))){
+	        	alley.upperWait = false;
+	        }
+	        
 	        cd.println("Remove Car no: " + no);
 	        cd.println("Disabled: "+ cond.disabled+", Semaphore release position: ("+cond.curpos.row+","+cond.curpos.col+") , Position: "+cond.curpos+", Destination: "+cond.startpos);
 	    } else {
@@ -337,7 +342,7 @@ public class CarControl implements CarControlI{
         
         } else {
         	cd.println("Car alredy exist");
-        	//conductor[no].printSemMap();
+        	conductor[no].printSemMap();
         }
     }
 
@@ -362,10 +367,11 @@ class Alley{
 	boolean[] fairnessGuard = new boolean[8];
 	Boolean upperWait = false;
 	Boolean lowerWait = false;
+	boolean[] carInAlley = new boolean[8];
+	
 	
 	
 	public synchronized void enter(int no) throws InterruptedException{
-		/* (no-1) mod 4*/
 		
 		Boolean tempBol = no>4 ? lowerWait : upperWait;
 		
@@ -388,6 +394,7 @@ class Alley{
 			tempBol = no>4 ? lowerWait : upperWait;
 		}
 		fairnessGuard[no-1] = true;
+		carInAlley[no-1] = true;
 		curDir = no>4; //no>4 is the direction of the car with the given number 
 		carCounter++;
 		
@@ -395,8 +402,11 @@ class Alley{
 	}
 	
 	public synchronized void leave(int no){
-		if(no>4 == curDir){
+		
+
+		if(no>4 == curDir && carInAlley[no-1]){
 			//Notes that the car has left the alley
+			carInAlley[no-1] = false;
 			carCounter--;
 			if (carCounter <= 0){
 				//In case that this is the last car, release the waiting cars
@@ -427,11 +437,12 @@ class Barrier {
 	int counter = 0;
 	int threshold = MAX_NO_CARS;
 	int newThreshold = threshold;
-	
+	boolean[] carWaiting = new boolean[8];
 	
 	public synchronized void sync(int no) throws InterruptedException {
 		if(flag) {
 			//Incremets the number of cars currently waiting
+			carWaiting[no-1] = true;
 			counter++;
 			if (counter >= threshold) {
 				//If the number of waiting cars exceeds the threshold free the other cars
@@ -440,6 +451,7 @@ class Barrier {
 				//Otherwise wait
 				
 				this.wait();
+				
 			}
 			
 		}
@@ -474,8 +486,19 @@ class Barrier {
 	
 	private void freeCars(){
 		this.notifyAll();
+		for(int i = 0; i < 8; i++){
+			carWaiting[i] = false;
+		}
 		counter = 0;
 		threshold = newThreshold;
+	}
+	
+	//Removes the car as waiting
+	public synchronized void carRemove(int no){
+		if(carWaiting[no-1]){
+			carWaiting[no-1] = false;
+			counter--;
+		}
 	}
 		
 }
