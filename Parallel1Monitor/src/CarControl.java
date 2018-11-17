@@ -315,7 +315,9 @@ public class CarControl implements CarControlI{
     		
 	        //Frees up old position
     		cd.deregister(cond.car);
+    		Pos next = cond.nextPos(cond.curpos);
 	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
+	        cond.semTiles[next.row][next.col].V();
 	        cd.println("Remove Car no: " + no);
 	        cd.println("Disabled: "+ cond.disabled+", Semaphore release position: ("+cond.curpos.row+","+cond.curpos.col+") , Position: "+cond.curpos+", Destination: "+cond.startpos);
 	    } else {
@@ -337,12 +339,10 @@ public class CarControl implements CarControlI{
 //				// TODO Auto-generated catch block
 //				e.printStackTrace();
 //			}
-    		Pos temppos = conductor[no].nextPos(conductor[no].curpos);
+    		
     		conductor[no] = new Conductor(no,cd,gate[no], semTiles, alley, bar, conductor[no].alleyEnter, conductor[no].alleyLeave);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
-            cd.println("Releasing: "+temppos);
-            semTiles[temppos.row][temppos.col].V();
     		conductor[no].printSemMap();
 	    	
         
