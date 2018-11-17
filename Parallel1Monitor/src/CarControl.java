@@ -67,7 +67,23 @@ class Conductor extends Thread {
     
     CarI car;
     
-    
+    public synchronized void printSemMap() {
+    	String positions = "";
+    	for(int i =0;i < this.semTiles.length;i++) {
+    		for(int j =0;j < this.semTiles[i].length;j++) {
+        		if(semTiles[i][j].toString().equals("1")){
+        			System.out.print("[ ]");
+        		}
+        		else {
+        			System.out.print("[X]");
+        			positions+="("+i+","+j+")";
+        		}
+        	}
+    		System.out.print("\n");
+    	}
+    	System.out.println("Positions: "+positions);
+    	System.out.println("[----------------------------------]");
+    }
     
     
     public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] semTiles, Alley alley, Barrier bar, Pos alleyEnter, Pos alleyLeave) {
@@ -85,7 +101,7 @@ class Conductor extends Thread {
         barpos   = cd.getBarrierPos(no);  // For later use
         
         disabledLock = new Semaphore(0);
-        disabled = false;
+        this.disabled = false;
         
         col = chooseColor();
 
@@ -97,6 +113,8 @@ class Conductor extends Thread {
         
     }
 
+    
+    
     public synchronized void setSpeed(double speed) { 
         basespeed = speed;
     }
@@ -139,18 +157,13 @@ class Conductor extends Thread {
             curpos = startpos;
             semTiles[startpos.row][startpos.col].P();
             cd.register(car);
-
+            
             
             //print speed af bil mens den kører
-            while (true) { 
+            while (true) {  
             	
-            	if(disabled){
-                    cd.println("Disabled Lock semaphore" + disabledLock.toString());
-            		disabledLock.P();
-                    cd.println("Running again");
-            		}
                 if (atGate(curpos)) { 
-                    mygate.pass();
+                    mygate.pass();    
                     car.setSpeed(chooseSpeed());//Has race condition(?)
                 }
                 
@@ -165,14 +178,9 @@ class Conductor extends Thread {
                 	alley.enter(no);
                 } 
                
+               driveAtomic(this);
                
                
-                semTiles[newpos.row][newpos.col].P();
-                
-                car.driveTo(newpos);
-                //Frees up old position
-                semTiles[curpos.row][curpos.col].V();
-                
                 
                 if(newpos.equals(alleyLeave)){
                 	alley.leave(no);
@@ -188,7 +196,29 @@ class Conductor extends Thread {
         }
     }
 
-
+private synchronized void driveAtomic(Conductor c) {
+     try {
+		semTiles[newpos.row][newpos.col].P();
+		
+	} catch (InterruptedException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+  
+     try {
+		car.driveTo(newpos);
+		semTiles[curpos.row][curpos.col].V();
+	} catch (InterruptedException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+     
+     //Frees up old position
+     
+     
+     
+  
+}
 
 }
 
@@ -281,13 +311,14 @@ public class CarControl implements CarControlI{
     		
     		cond.disabled = true;
     		
-    		
-	    	
 	        //Frees up old position
+    		cd.deregister(cond.car);
+    		Pos next = cond.nextPos(cond.curpos);
 	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
-	        cd.deregister(cond.car);
-	        
+	        cond.semTiles[next.row][next.col].V();
+	        alley.leave(no);
 	        cd.println("Remove Car no: " + no);
+	        cd.println("Disabled: "+ cond.disabled+", Semaphore release position: ("+cond.curpos.row+","+cond.curpos.col+") , Position: "+cond.curpos+", Destination: "+cond.startpos);
 	    } else {
 	    	cd.println("Car already removed");
 	    }
@@ -295,27 +326,18 @@ public class CarControl implements CarControlI{
 
     public synchronized void restoreCar(int no) { 
     	
-    	Conductor cond = conductor[no];
     	
-    	if(cond.disabled){
+    	
+    	if(conductor[no].disabled){
+    		conductor[no] = new Conductor(no,cd,gate[no], semTiles, alley, bar, conductor[no].alleyEnter, conductor[no].alleyLeave);
+            conductor[no].setName("Conductor-" + no);
+            conductor[no].start();
     		
-	    	cond.car = cd.newCar(no, cond.col, cond.startpos);
-	        cond.curpos = cond.startpos;
-	        try {
-				cond.semTiles[cond.curpos.row][cond.curpos.col].P();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    		cond.disabled = false;
-	        cd.register(cond.car);
-	    	cond.disabledLock.V();
-    	
-	    	cd.println("Restore Car no: " + no);
-	    	cd.println("Car info: \n Speed: " + cond.basespeed + " \n Variaton: " + cond.variation);
+	    	
         
         } else {
         	cd.println("Car alredy exist");
+        	//conductor[no].printSemMap();
         }
     }
 
@@ -328,7 +350,7 @@ public class CarControl implements CarControlI{
     public void setVariation(int no, int var) { 
         conductor[no].setVariation(var);
     }
-
+ 
 }
 
 class Alley{
@@ -347,7 +369,7 @@ class Alley{
 		
 		Boolean tempBol = no>4 ? lowerWait : upperWait;
 		
-		while((carCounter != 0 && no>4 != curDir) || (fairnessGuard[no-1] && (tempBol) )){
+		while((carCounter != 0 && no>4 != curDir)|| (fairnessGuard[no-1] && (tempBol) ) ){
 			
 			if(no>4){
 				upperWait = true;
