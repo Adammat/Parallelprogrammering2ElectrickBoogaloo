@@ -311,15 +311,17 @@ public class CarControl implements CarControlI{
     		cd.deregister(cond.car);
     		Pos next = cond.nextPos(cond.curpos);
 	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
-	        cond.semTiles[next.row][next.col].V();
+
 	        alley.leave(no);
 	        alley.fairnessGuard[no-1] = false;
-	        bar.carRemove(no);
 	        
+	        Boolean tempBool = !bar.carRemove(no);
 	        if(cond.curpos.equals(new Pos(ROWS-2,2)) || cond.curpos.equals(new Pos(ROWS-3,0))){
 	        	alley.lowerWait = false;
 	        } else if (cond.curpos.equals(new Pos(1,0))){
 	        	alley.upperWait = false;
+	        } else if(tempBool){
+		        cond.semTiles[next.row][next.col].V();
 	        }
 	        
 	        cd.println("Remove Car no: " + no);
@@ -494,11 +496,13 @@ class Barrier {
 	}
 	
 	//Removes the car as waiting
-	public synchronized void carRemove(int no){
+	public synchronized boolean carRemove(int no){
 		if(carWaiting[no-1]){
 			carWaiting[no-1] = false;
 			counter--;
+			return true;
 		}
+		return false;
 	}
 		
 }
