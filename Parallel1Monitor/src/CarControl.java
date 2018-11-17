@@ -197,7 +197,6 @@ class Conductor extends Thread {
     }
 
 private synchronized void driveAtomic(Conductor c) {
-	 cd.println("Trying to drive to"+ newpos);
      try {
 		semTiles[newpos.row][newpos.col].P();
 		
@@ -205,11 +204,10 @@ private synchronized void driveAtomic(Conductor c) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
-     cd.println("Driving to "+ newpos);
+  
      try {
 		car.driveTo(newpos);
 		semTiles[curpos.row][curpos.col].V();
-		cd.println("Rel: "+curpos);
 	} catch (InterruptedException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
@@ -318,6 +316,7 @@ public class CarControl implements CarControlI{
     		Pos next = cond.nextPos(cond.curpos);
 	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
 	        cond.semTiles[next.row][next.col].V();
+	        alley.leave(no);
 	        cd.println("Remove Car no: " + no);
 	        cd.println("Disabled: "+ cond.disabled+", Semaphore release position: ("+cond.curpos.row+","+cond.curpos.col+") , Position: "+cond.curpos+", Destination: "+cond.startpos);
 	    } else {
@@ -330,24 +329,15 @@ public class CarControl implements CarControlI{
     	
     	
     	if(conductor[no].disabled){
-    		
-//	    	cond.car = cd.newCar(no, cond.col, cond.startpos);
-//	        cond.curpos = cond.startpos;
-//	        try {
-//				cond.semTiles[cond.curpos.row][cond.curpos.col].P();
-//			} catch (InterruptedException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-    		
     		conductor[no] = new Conductor(no,cd,gate[no], semTiles, alley, bar, conductor[no].alleyEnter, conductor[no].alleyLeave);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
-    		conductor[no].printSemMap();
+    		
 	    	
         
         } else {
         	cd.println("Car alredy exist");
+        	//conductor[no].printSemMap();
         }
     }
 
@@ -379,7 +369,7 @@ class Alley{
 		
 		Boolean tempBol = no>4 ? lowerWait : upperWait;
 		
-		while((carCounter != 0 && no>4 != curDir) || (fairnessGuard[no-1] && (tempBol) )){
+		while((carCounter != 0 && no>4 != curDir)|| (fairnessGuard[no-1] && (tempBol) ) ){
 			
 			if(no>4){
 				upperWait = true;
