@@ -6,7 +6,7 @@
 
 
 import java.awt.Color;
-
+import java.util.ArrayList;
 class Gate {
 
     Semaphore g = new Semaphore(0);
@@ -43,7 +43,7 @@ class Conductor extends Thread {
     boolean INFFLAG = false;
     double basespeed = 6.0;          // Tiles per second
     double variation =  50;          // Percentage of base speed
-
+    ArrayList<Pos> claimedTiles = new ArrayList<Pos>();
     CarDisplayI cd;                  // GUI part
     Semaphore[][] semTiles;			 // anti crash semaphores
     Boolean[][] alleyTiles;			 //Grid for the alley
@@ -64,10 +64,9 @@ class Conductor extends Thread {
     Alley alley = new Alley();
     Pos alleyEnter;
     Pos alleyLeave;
-    
     CarI car;
     
-    public synchronized void printSemMap() {
+    public synchronized void printTrackDebug() {
     	String positions = "";
     	for(int i =0;i < this.semTiles.length;i++) {
     		for(int j =0;j < this.semTiles[i].length;j++) {
@@ -78,6 +77,8 @@ class Conductor extends Thread {
     		System.out.print("\n");
     	}
     	System.out.println("Positions: "+positions);
+    	System.out.println("[----------------------------------]");
+    	System.out.println("Ally Status:[U: "+alley.upWaiting+", L: "+alley.downWaiting+"] ");
     	System.out.println("[----------------------------------]");
     }
     
@@ -95,7 +96,6 @@ class Conductor extends Thread {
         mygate = g;
         startpos = cd.getStartPos(no);
         barpos   = cd.getBarrierPos(no);  // For later use
-        
         disabledLock = new Semaphore(0);
         this.disabled = false;
         
@@ -151,7 +151,7 @@ class Conductor extends Thread {
         	
             car = cd.newCar(no, col, startpos);
             curpos = startpos;
-            semTiles[startpos.row][startpos.col].P();
+            lockTile(startpos);
             cd.register(car);
             
             
@@ -174,10 +174,10 @@ class Conductor extends Thread {
                 	alley.enter(no);
                 } 
                
-               driveAtomic(this);
-               
-               
-                
+                	lockTile(newpos);
+            		car.driveTo(newpos);
+            		unlockTile(curpos);
+
                 if(newpos.equals(alleyLeave)){
                 	alley.leave(no);
                 }
@@ -192,33 +192,37 @@ class Conductor extends Thread {
         }
     }
 
-private synchronized void driveAtomic(Conductor c) {
-     try {
-		semTiles[newpos.row][newpos.col].P();
+private synchronized void lockTile(Pos p) {
+	try {
+		if(!disabled) {
+		semTiles[p.row][p.col].P();
+		this.claimedTiles.add(p);
+		}
 		
 	} catch (InterruptedException e) {
 		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
-  
-     try {
-		car.driveTo(newpos);
-		semTiles[curpos.row][curpos.col].V();
-	} catch (InterruptedException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
-     
-     //Frees up old position
-     
-     
-     
-  
+	
 }
+
+private synchronized void unlockTile(Pos p) {
+		semTiles[p.row][p.col].V();
+		this.claimedTiles.remove(p);
+}
+
+public synchronized void unlockAllTiles() {
+	for(Pos p : this.claimedTiles) {
+		semTiles[p.row][p.col].V();
+	}
+	this.claimedTiles.removeAll(claimedTiles);
+}
+
 
 }
 
 public class CarControl implements CarControlI{
+
 
 	Barrier bar;
     CarDisplayI cd;           // Reference to GUI
@@ -287,6 +291,7 @@ public class CarControl implements CarControlI{
 
     public void barrierOff() {
     	bar.off();
+    	conductor[0].printTrackDebug();
     	}
 
     public void barrierSet(int k) { 
@@ -309,20 +314,15 @@ public class CarControl implements CarControlI{
     		
 	        //Frees up old position
     		cd.deregister(cond.car);
-    		Pos next = cond.nextPos(cond.curpos);
-	        cond.semTiles[cond.curpos.row][cond.curpos.col].V();
+    		cond.unlockAllTiles();
 
 	        alley.leave(no);
-	        alley.fairnessGuard[no-1] = false;
-	        
-	        Boolean tempBool = !bar.carRemove(no);
+	        alley.waitForOpposing[no-1] = false;
 	        if(cond.curpos.equals(new Pos(ROWS-2,2)) || cond.curpos.equals(new Pos(ROWS-3,0))){
-	        	alley.lowerWait = false;
+	        	alley.downWaiting = false;
 	        } else if (cond.curpos.equals(new Pos(1,0))){
-	        	alley.upperWait = false;
-	        } else if(tempBool){
-		        cond.semTiles[next.row][next.col].V();
-	        }
+	        	alley.upWaiting = false;
+	        } 
 	        
 	        cd.println("Remove Car no: " + no);
 	        cd.println("Disabled: "+ cond.disabled+", Semaphore release position: ("+cond.curpos.row+","+cond.curpos.col+") , Position: "+cond.curpos+", Destination: "+cond.startpos);
@@ -344,7 +344,7 @@ public class CarControl implements CarControlI{
         
         } else {
         	cd.println("Car alredy exist");
-        	conductor[no].printSemMap();
+        	//conductor[no].printSemMap();
         }
     }
 
@@ -361,46 +361,60 @@ public class CarControl implements CarControlI{
 }
 
 class Alley{
-
-	final int MAX_NO_CARS = 8;
-	int carCounter = 0;
+	
 	int waitCars = 0;
+	int currentCars = 0;
+	final int MAX_NO_CARS = 8;
 	Boolean curDir = false; //False = up, True = down
-	boolean[] fairnessGuard = new boolean[8];
-	Boolean upperWait = false;
-	Boolean lowerWait = false;
+	Boolean upWaiting = false;
+	Boolean downWaiting = false;
 	boolean[] carInAlley = new boolean[8];
+	boolean[] waitForOpposing = new boolean[8];
 	
 	
 	
 	public synchronized void enter(int no) throws InterruptedException{
-		
-		Boolean tempBol = no>4 ? lowerWait : upperWait;
-		
-		while((carCounter != 0 && no>4 != curDir)|| (fairnessGuard[no-1] && (tempBol) ) ){
-			
+		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
+		while((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting)) {
 			if(no>4){
-				upperWait = true;
+				upWaiting = true;
 			} else {
-				lowerWait = true;
+				downWaiting = true;
 			}
-			
 			this.wait();
 			
-			if(no>4){
-				upperWait = false;
-			} else {
-				lowerWait = false;
-			}
-			
-			tempBol = no>4 ? lowerWait : upperWait;
 		}
-		fairnessGuard[no-1] = true;
+		waitForOpposing[no-1] = true;
 		carInAlley[no-1] = true;
-		curDir = no>4; //no>4 is the direction of the car with the given number 
-		carCounter++;
+		curDir = no>4;
+		currentCars++;
 		
-		
+//		
+//		
+//		while((carCounter != 0 && no>4 != curDir)|| (fairnessGuard[no-1] && (tempBol) ) ){
+//			
+//			if(no>4){
+//				upperWait = true;
+//			} else {
+//				lowerWait = true;
+//			}
+//			
+//			this.wait();
+//			
+//			if(no>4){
+//				upperWait = false;
+//			} else {
+//				lowerWait = false;
+//			}
+//			
+//			tempBol = no>4 ? lowerWait : upperWait;
+//		}
+//		fairnessGuard[no-1] = true;
+//		carInAlley[no-1] = true;
+//		curDir = no>4; //no>4 is the direction of the car with the given number 
+//		carCounter++;
+//		
+//		
 	}
 	
 	public synchronized void leave(int no){
@@ -409,14 +423,19 @@ class Alley{
 		if(no>4 == curDir && carInAlley[no-1]){
 			//Notes that the car has left the alley
 			carInAlley[no-1] = false;
-			carCounter--;
-			if (carCounter <= 0){
+			currentCars--;
+			if (currentCars <= 0){
 				//In case that this is the last car, release the waiting cars
-				carCounter = 0;
+				currentCars = 0;
 				int offSet = no>4 ? 0 : 4;
 				
 				for(int i = offSet; i < offSet+4; i++){
-					fairnessGuard[i] = false;
+					waitForOpposing[i] = false;
+				}
+				if(no>4){
+					upWaiting = false;
+				} else {
+					downWaiting = false;
 				}
 				this.notifyAll();
 				
