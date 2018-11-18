@@ -81,6 +81,8 @@ class Conductor extends Thread {
     	System.out.println("[----------------------------------]");
     	System.out.println("Ally Status:[U: "+alley.upWaiting+", L: "+alley.downWaiting+"] ");
     	System.out.println("WaitArray: "+Arrays.toString(alley.waitForOpposing)+"]");
+    	System.out.println("DisabledArray: "+Arrays.toString(alley.getCarDisabled())+"]");
+    	System.out.println("Current Direction:(False= up, True= down) "+alley.curDir+"]");
     	System.out.println("[----------------------------------]");
     }
     
@@ -378,34 +380,40 @@ class Alley{
 	
 	public Alley() {
 		for(int i =0;i<MAX_NO_CARS;i++) {
-			carDisabled[i]=false;
+			getCarDisabled()[i]=false;
 		}
 	}
 	
 	public synchronized void disableCar(int no) {
-		carDisabled[no-1] = true;
+		getCarDisabled()[no-1] = true;
 	}
 	public synchronized void enableCar(int no) {
-		carDisabled[no-1] = false;
+		getCarDisabled()[no-1] = false;
 	}
 	public synchronized void enter(int no) throws InterruptedException{
-		int offSet = no>4 ? 0 : 4;
 		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
-		boolean noCarsWaiting = !(waitForOpposing[offSet] && waitForOpposing[offSet+1]&& waitForOpposing[offSet+2] && waitForOpposing[offSet+3]);
-
+		int invoffSet = no>4 ? 4 : 0;
+		boolean opposingDisabled = (getCarDisabled()[invoffSet] && getCarDisabled()[invoffSet+1]&& getCarDisabled()[invoffSet+2] && getCarDisabled()[invoffSet+3]);
 		while(((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting))) {
 			
 			if(no>4){
+				if(!downWaiting) {
 				upWaiting = true;
+				}
 			} else {
+				if(!upWaiting) {
 				downWaiting = true;
+				}
+				
 			}
 			
 			this.wait();
 			
 		}
-		if(!carDisabled[no-1]) {
+		if(!getCarDisabled()[no-1]) {
+		if(!opposingDisabled) {
 		waitForOpposing[no-1] = true;
+			}
 		carInAlley[no-1] = true;
 		curDir = no>4;
 		currentCars++;
@@ -443,7 +451,9 @@ class Alley{
 
 		int offSet = no>4 ? 0 : 4;
 		int invoffSet = no>4 ? 4 : 0;
+		boolean opposingDisabled = (getCarDisabled()[invoffSet] && getCarDisabled()[invoffSet+1]&& getCarDisabled()[invoffSet+2] && getCarDisabled()[invoffSet+3]);
 		boolean noCarsWaiting = !(waitForOpposing[invoffSet] && waitForOpposing[invoffSet+1]&& waitForOpposing[invoffSet+2] && waitForOpposing[invoffSet+3]);
+
 		if(no>4 == curDir && carInAlley[no-1]){
 			//Notes that the car has left the alley
 			carInAlley[no-1] = false;
@@ -462,13 +472,20 @@ class Alley{
 					downWaiting = false;
 				}
 				this.notifyAll();
-				
-			}else {
-				
+				curDir = !(no>4);
 			}
+			
 		}else{
 			waitForOpposing[no-1] = false;
-			if(noCarsWaiting) {
+			if(opposingDisabled) {
+				for(int i = invoffSet; i < invoffSet+4; i++){
+					waitForOpposing[i] = false;
+				}
+				downWaiting = false;
+				upWaiting = false;
+				this.notifyAll();
+				curDir = no>4;
+			}else if(noCarsWaiting) {
 				if(no>4){
 					upWaiting = false;
 				} else {
@@ -477,6 +494,14 @@ class Alley{
 			}
 		}//*/
 		
+	}
+
+	public boolean[] getCarDisabled() {
+		return carDisabled;
+	}
+
+	public void setCarDisabled(boolean[] carDisabled) {
+		this.carDisabled = carDisabled;
 	}
 	
 	
