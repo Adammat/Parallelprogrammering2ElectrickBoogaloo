@@ -7,6 +7,7 @@
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 class Gate {
 
     Semaphore g = new Semaphore(0);
@@ -79,6 +80,7 @@ class Conductor extends Thread {
     	System.out.println("Positions: "+positions);
     	System.out.println("[----------------------------------]");
     	System.out.println("Ally Status:[U: "+alley.upWaiting+", L: "+alley.downWaiting+"] ");
+    	System.out.println("WaitArray: "+Arrays.toString(alley.waitForOpposing)+"]");
     	System.out.println("[----------------------------------]");
     }
     
@@ -315,7 +317,7 @@ public class CarControl implements CarControlI{
 	        //Frees up old position
     		cd.deregister(cond.car);
     		cond.unlockAllTiles();
-
+    		alley.disableCar(no);
 	        alley.leave(no);
 	        alley.waitForOpposing[no-1] = false;
 	        if(cond.curpos.equals(new Pos(ROWS-2,2)) || cond.curpos.equals(new Pos(ROWS-3,0))){
@@ -336,6 +338,7 @@ public class CarControl implements CarControlI{
     	
     	
     	if(conductor[no].disabled){
+    		alley.enableCar(no);
     		conductor[no] = new Conductor(no,cd,gate[no], semTiles, alley, bar, conductor[no].alleyEnter, conductor[no].alleyLeave);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
@@ -368,26 +371,45 @@ class Alley{
 	Boolean curDir = false; //False = up, True = down
 	Boolean upWaiting = false;
 	Boolean downWaiting = false;
-	boolean[] carInAlley = new boolean[8];
-	boolean[] waitForOpposing = new boolean[8];
+	boolean[] carInAlley = new boolean[MAX_NO_CARS];
+	boolean[] waitForOpposing = new boolean[MAX_NO_CARS];
+	private boolean[] carDisabled = new boolean[MAX_NO_CARS];
 	
 	
+	public Alley() {
+		for(int i =0;i<MAX_NO_CARS;i++) {
+			carDisabled[i]=false;
+		}
+	}
 	
+	public synchronized void disableCar(int no) {
+		carDisabled[no-1] = true;
+	}
+	public synchronized void enableCar(int no) {
+		carDisabled[no-1] = false;
+	}
 	public synchronized void enter(int no) throws InterruptedException{
+		int offSet = no>4 ? 0 : 4;
 		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
-		while((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting)) {
+		boolean noCarsWaiting = !(waitForOpposing[offSet] && waitForOpposing[offSet+1]&& waitForOpposing[offSet+2] && waitForOpposing[offSet+3]);
+
+		while(((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting))) {
+			
 			if(no>4){
 				upWaiting = true;
 			} else {
 				downWaiting = true;
 			}
+			
 			this.wait();
 			
 		}
+		if(!carDisabled[no-1]) {
 		waitForOpposing[no-1] = true;
 		carInAlley[no-1] = true;
 		curDir = no>4;
 		currentCars++;
+		}
 		
 //		
 //		
@@ -418,8 +440,10 @@ class Alley{
 	}
 	
 	public synchronized void leave(int no){
-		
 
+		int offSet = no>4 ? 0 : 4;
+		int invoffSet = no>4 ? 4 : 0;
+		boolean noCarsWaiting = !(waitForOpposing[invoffSet] && waitForOpposing[invoffSet+1]&& waitForOpposing[invoffSet+2] && waitForOpposing[invoffSet+3]);
 		if(no>4 == curDir && carInAlley[no-1]){
 			//Notes that the car has left the alley
 			carInAlley[no-1] = false;
@@ -427,7 +451,7 @@ class Alley{
 			if (currentCars <= 0){
 				//In case that this is the last car, release the waiting cars
 				currentCars = 0;
-				int offSet = no>4 ? 0 : 4;
+				
 				
 				for(int i = offSet; i < offSet+4; i++){
 					waitForOpposing[i] = false;
@@ -439,6 +463,17 @@ class Alley{
 				}
 				this.notifyAll();
 				
+			}else {
+				
+			}
+		}else{
+			waitForOpposing[no-1] = false;
+			if(noCarsWaiting) {
+				if(no>4){
+					upWaiting = false;
+				} else {
+					downWaiting = false;
+				}
 			}
 		}//*/
 		
