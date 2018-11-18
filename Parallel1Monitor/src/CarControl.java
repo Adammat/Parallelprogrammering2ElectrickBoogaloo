@@ -83,6 +83,8 @@ class Conductor extends Thread {
     	System.out.println("WaitArray: "+Arrays.toString(alley.waitForOpposing)+"]");
     	System.out.println("DisabledArray: "+Arrays.toString(alley.getCarDisabled())+"]");
     	System.out.println("Current Direction:(False= up, True= down) "+alley.curDir+"]");
+    	System.out.println("AlleyCars: "+alley.currentCars+"]");
+    	
     	System.out.println("[----------------------------------]");
     }
     
@@ -393,7 +395,13 @@ class Alley{
 	public synchronized void enter(int no) throws InterruptedException{
 		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
 		int invoffSet = no>4 ? 4 : 0;
+		
+		
+		
+		
 		boolean opposingDisabled = (getCarDisabled()[invoffSet] && getCarDisabled()[invoffSet+1]&& getCarDisabled()[invoffSet+2] && getCarDisabled()[invoffSet+3]);
+		
+	
 		while(((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting))) {
 			
 			if(no>4){
@@ -413,6 +421,7 @@ class Alley{
 		if(!getCarDisabled()[no-1]) {
 		if(!opposingDisabled) {
 		waitForOpposing[no-1] = true;
+		
 			}
 		carInAlley[no-1] = true;
 		curDir = no>4;
@@ -451,10 +460,13 @@ class Alley{
 
 		int offSet = no>4 ? 0 : 4;
 		int invoffSet = no>4 ? 4 : 0;
-		boolean opposingDisabled = (getCarDisabled()[invoffSet] && getCarDisabled()[invoffSet+1]&& getCarDisabled()[invoffSet+2] && getCarDisabled()[invoffSet+3]);
+		boolean currentDisabled = (getCarDisabled()[offSet] && getCarDisabled()[offSet+1]&& getCarDisabled()[offSet+2] && getCarDisabled()[offSet+3]);
 		boolean noCarsWaiting = !(waitForOpposing[invoffSet] && waitForOpposing[invoffSet+1]&& waitForOpposing[invoffSet+2] && waitForOpposing[invoffSet+3]);
 
 		if(no>4 == curDir && carInAlley[no-1]){
+			if(getCarDisabled()[no-1]) {
+				System.out.println("I was marked for death in the alley");
+			}
 			//Notes that the car has left the alley
 			carInAlley[no-1] = false;
 			currentCars--;
@@ -472,26 +484,50 @@ class Alley{
 					downWaiting = false;
 				}
 				this.notifyAll();
-				curDir = !(no>4);
-			}
+				
+				
+		}
 			
-		}else{
-			waitForOpposing[no-1] = false;
-			if(opposingDisabled) {
-				for(int i = invoffSet; i < invoffSet+4; i++){
+			
+		}else {
+	
+
+			Boolean groupWaiting = no>4 ? downWaiting : upWaiting;
+			if(!groupWaiting) {
+				for(int i = offSet; i < offSet+4; i++){
 					waitForOpposing[i] = false;
 				}
-				downWaiting = false;
-				upWaiting = false;
-				this.notifyAll();
-				curDir = no>4;
-			}else if(noCarsWaiting) {
-				if(no>4){
 					upWaiting = false;
-				} else {
+				
 					downWaiting = false;
-				}
+				
+				waitForOpposing[no-1] = false;
+				
+				this.notifyAll();
+			
 			}
+			
+			
+			
+//			waitForOpposing[no-1] = false;
+//			if(currentDisabled) {
+//				for(int i = invoffSet; i < invoffSet+4; i++){
+//					waitForOpposing[i] = false;
+//				}
+//				
+//				downWaiting = false;
+//				upWaiting = false;
+//				System.out.println("(D)I was the last, let others go! ["+no+"] "+curDir);
+//				this.notifyAll();
+//			}else if(noCarsWaiting) {
+//				if(no>4){
+//					upWaiting = false;
+//				} else {
+//					downWaiting = false;	
+//				}
+//				System.out.println("I was the last, let others go! ["+no+"] "+curDir);
+//				
+//			}
 		}//*/
 		
 	}
