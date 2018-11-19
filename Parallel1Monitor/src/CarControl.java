@@ -393,13 +393,9 @@ class Alley{
 		getCarDisabled()[no-1] = false;
 	}
 	public synchronized void enter(int no) throws InterruptedException{
-		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
 		int invoffSet = no>4 ? 4 : 0;
-		
-		
-		
-		
 		boolean opposingDisabled = (getCarDisabled()[invoffSet] && getCarDisabled()[invoffSet+1]&& getCarDisabled()[invoffSet+2] && getCarDisabled()[invoffSet+3]);
+		Boolean opposingIsWaiting = no>4 ? downWaiting : upWaiting;
 		
 	
 		while(((currentCars != 0 && no>4 != curDir) || (waitForOpposing[no-1] && opposingIsWaiting))) {
@@ -459,14 +455,7 @@ class Alley{
 	public synchronized void leave(int no){
 
 		int offSet = no>4 ? 0 : 4;
-		int invoffSet = no>4 ? 4 : 0;
-		boolean currentDisabled = (getCarDisabled()[offSet] && getCarDisabled()[offSet+1]&& getCarDisabled()[offSet+2] && getCarDisabled()[offSet+3]);
-		boolean noCarsWaiting = !(waitForOpposing[invoffSet] && waitForOpposing[invoffSet+1]&& waitForOpposing[invoffSet+2] && waitForOpposing[invoffSet+3]);
-
 		if(no>4 == curDir && carInAlley[no-1]){
-			if(getCarDisabled()[no-1]) {
-				System.out.println("I was marked for death in the alley");
-			}
 			//Notes that the car has left the alley
 			carInAlley[no-1] = false;
 			currentCars--;
@@ -554,12 +543,12 @@ class Barrier {
 	int counter = 0;
 	int threshold = MAX_NO_CARS;
 	int newThreshold = threshold;
-	boolean[] carWaiting = new boolean[8];
+	boolean[] carWaiting = new boolean[MAX_NO_CARS];
 	
 	public synchronized void sync(int no) throws InterruptedException {
 		if(flag) {
 			//Incremets the number of cars currently waiting
-			carWaiting[no-1] = true;
+			carWaiting[no] = true;
 			counter++;
 			if (counter >= threshold) {
 				//If the number of waiting cars exceeds the threshold free the other cars
@@ -603,7 +592,7 @@ class Barrier {
 	
 	private void freeCars(){
 		this.notifyAll();
-		for(int i = 0; i < 8; i++){
+		for(int i = 0; i < MAX_NO_CARS; i++){
 			carWaiting[i] = false;
 		}
 		counter = 0;
@@ -612,8 +601,8 @@ class Barrier {
 	
 	//Removes the car as waiting
 	public synchronized boolean carRemove(int no){
-		if(carWaiting[no-1]){
-			carWaiting[no-1] = false;
+		if(carWaiting[no]){
+			carWaiting[no] = false;
 			counter--;
 			return true;
 		}
