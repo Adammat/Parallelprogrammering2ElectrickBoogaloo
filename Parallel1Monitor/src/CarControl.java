@@ -53,7 +53,7 @@ class Conductor extends Thread {
 	final static int steps = 10;
 	static final int upperBarRow = 4;
 	static final int lowerBarRow = 5;
-	boolean INFFLAG = false;
+	boolean INFFLAG = true;
 	double basespeed = 6.0; // Tiles per second
 	double variation = 50; // Percentage of base speed
 	ArrayList<Pos> claimedTiles = new ArrayList<Pos>(); //Ledger of claimed semaphores
@@ -222,8 +222,12 @@ class Conductor extends Thread {
 
 	private synchronized void unlockTile(Pos p) {
 		//Unlock tiles and forget that you did it.
+		if(!semTiles[p.row][p.col].toString().equals("0")) {
+			System.out.println("I am unlocking something that is already unlocked: "+ semTiles[p.row][p.col].toString());
+		}
 		semTiles[p.row][p.col].V();
 		this.claimedTiles.remove(p);
+		
 	}
 	//Mass removal of claimed tiles, used for removing a car
 	public synchronized void unlockAllTiles() {
@@ -424,7 +428,10 @@ class Alley {
 		//You have been through once and the opposite side is waiting
 		//Then you wait.
 		while (((currentCars != 0 && no > 4 != curDir) || (waitForOpposing[no - 1] && opposingIsWaiting))) {
+			if (!getCarDisabled()[no - 1]) {
 			setWaitingDirection(no);
+			}
+			
 			this.wait();
 		}
 		//If you are still active
