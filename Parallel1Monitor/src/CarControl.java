@@ -53,7 +53,7 @@ class Conductor extends Thread {
 	final static int steps = 10;
 	static final int upperBarRow = 4;
 	static final int lowerBarRow = 5;
-	boolean INFFLAG = true;
+	boolean INFFLAG = false;
 	double basespeed = 6.0; // Tiles per second
 	double variation = 50; // Percentage of base speed
 	ArrayList<Pos> claimedTiles = new ArrayList<Pos>(); //Ledger of claimed semaphores
@@ -342,6 +342,8 @@ public class CarControl implements CarControlI {
 			alley.waitForOpposing[no - 1] = false;
 			//Clear direction wait
 			clearAlleyEntrance(cond);
+			//
+			bar.carRemove(no);
 		} else {
 			cd.println("Car already removed");
 		}
@@ -562,13 +564,11 @@ class Barrier {
 	}
 
 	// Removes the car as waiting ( Used to remotely remove car)
-	public synchronized boolean carRemove(int no) {
+	public synchronized void carRemove(int no) {
 		if (carWaiting[no]) {
 			carWaiting[no] = false;
 			counter--;
-			return true;
 		}
-		return false;
 	}
 
 }
