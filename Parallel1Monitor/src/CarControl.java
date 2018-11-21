@@ -75,27 +75,6 @@ class Conductor extends Thread {
 	Pos alleyEnter; //Entry point of alley
 	Pos alleyLeave; //Exit point of alley
 	CarI car;
-
-	public synchronized void printTrackDebug() {
-		String positions = "";
-		for (int i = 0; i < this.semTiles.length; i++) {
-			for (int j = 0; j < this.semTiles[i].length; j++) {
-				System.out.print("[" + semTiles[i][j].toString() + "]");
-
-			}
-			System.out.print("\n");
-		}
-		System.out.println("Positions: " + positions);
-		System.out.println("[----------------------------------]");
-		System.out.println("Ally Status:[U: " + alley.upWaiting + ", L: " + alley.downWaiting + "] ");
-		System.out.println("WaitArray: " + Arrays.toString(alley.waitForOpposing) + "]");
-		System.out.println("DisabledArray: " + Arrays.toString(alley.getCarDisabled()) + "]");
-		System.out.println("Current Direction:(False= up, True= down) " + alley.curDir + "]");
-		System.out.println("AlleyCars: " + alley.currentCars + "]");
-
-		System.out.println("[----------------------------------]");
-	}
-
 	public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] semTiles, Alley alley, Barrier bar, Pos alleyEnter, Pos alleyLeave) {
 		this.alleyEnter = alleyEnter;
 		this.alleyLeave = alleyLeave;
@@ -303,7 +282,6 @@ public class CarControl implements CarControlI {
 
 	public void barrierOff() {
 		bar.off();
-		conductor[0].printTrackDebug();
 	}
 
 	public void barrierSet(int k) {
@@ -342,7 +320,7 @@ public class CarControl implements CarControlI {
 			alley.waitForOpposing[no - 1] = false;
 			//Clear direction wait
 			clearAlleyEntrance(cond);
-			//
+			//Make sure the barrier does not think we are still there
 			bar.carRemove(no);
 		} else {
 			cd.println("Car already removed");
