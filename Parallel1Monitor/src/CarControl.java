@@ -190,7 +190,7 @@ class Conductor extends Thread {
 		try {
 			//Initialise car
 			initCar();
-			while (true) {
+			while (!disabled) {
 				//Check if we are at the gate
 				if (atGate(curpos)) {
 					mygate.pass();
@@ -201,7 +201,9 @@ class Conductor extends Thread {
 					bar.sync(no);
 				}
 				//Then update our position and go again
+			
 				updatePosition();
+				
 			}
 
 		} catch (Exception e) {
@@ -222,9 +224,6 @@ class Conductor extends Thread {
 
 	private synchronized void unlockTile(Pos p) {
 		//Unlock tiles and forget that you did it.
-		if(!semTiles[p.row][p.col].toString().equals("0")) {
-			System.out.println("I am unlocking something that is already unlocked: "+ semTiles[p.row][p.col].toString());
-		}
 		semTiles[p.row][p.col].V();
 		this.claimedTiles.remove(p);
 		
